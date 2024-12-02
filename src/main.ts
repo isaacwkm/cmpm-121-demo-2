@@ -3,6 +3,7 @@ import "./style.css";
 const APP_NAME = "Gooood Morning World";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
+// Set the document title
 document.title = APP_NAME;
 
 // Game Title
@@ -15,50 +16,39 @@ const canvas = document.createElement("canvas");
 canvas.width = 256;
 canvas.height = 256;
 app.append(canvas);
+
 const ctx = canvas.getContext("2d");
+if (!ctx) {
+  throw new Error("Failed to get 2D context");
+}
 clearCanvas();
 
 // Data Structures
-let strokes: { x: number; y: number }[][] = [];
-let currentStroke: { x: number; y: number }[] = [];
 let drawFlag = false;
+let currentStroke: { x: number; y: number }[] = [];
+let strokes: { x: number; y: number }[][] = [];
 
-// Observer Pattern
-class Observable<T> {
-  private listeners: Array<(data: T) => void> = [];
-  
-  subscribe(listener: (data: T) => void) {
-    this.listeners.push(listener);
-  }
-  
-  notify(data: T) {
-    this.listeners.forEach((listener) => listener(data));
-  }
-}
-
-const strokeObserver = new Observable<{ x: number; y: number }[]>();
-
-// Canvas Event Listeners
+// Mouse Events
 canvas.addEventListener("mousedown", () => {
   drawFlag = true;
   currentStroke = []; // Start a new stroke
 });
 
-canvas.addEventListener("mouseup", () => {
-  drawFlag = false;
-  if (currentStroke.length > 0) {
-    strokes.push(currentStroke); // Save completed stroke
-    strokeObserver.notify(currentStroke); // Notify observers
-  }
+canvas.addEventListener("mousemove", (event) => {
+  if (!drawFlag) return;
+
+  const { x, y } = getMousePosition(event);
+  currentStroke.push({ x, y }); // Add point to the current stroke
+  DrawingChanged(); // Dispatch the event after adding a point
 });
 
-canvas.addEventListener("mousemove", (event) => {
-  if (drawFlag && ctx) {
-    const bounds = canvas.getBoundingClientRect();
-    const x = event.clientX - bounds.left;
-    const y = event.clientY - bounds.top;
-    drawPoint(x, y, "black");
-    currentStroke.push({ x, y }); // Save point
+// When mouse is released, save the completed stroke and dispatch the event
+canvas.addEventListener("mouseup", () => {
+  drawFlag = false; // Stop drawing
+  if (currentStroke.length > 0) {
+    strokes.push(currentStroke); // Save the completed stroke
+    DrawingChanged(); // Dispatch event to trigger redrawing
+    console.log("Stroke completed:", currentStroke);
   }
 });
 
@@ -70,7 +60,7 @@ clearButton.addEventListener("click", () => {
   strokes = []; // Reset strokes
 });
 
-// Functions
+// Helper Functions
 function setTitle() {
   title.textContent = APP_NAME;
   title.style.textAlign = "center";
@@ -78,21 +68,23 @@ function setTitle() {
 }
 
 function clearCanvas() {
-  if (ctx) {
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  } else {
-    console.error("Failed to get context");
+  if (!ctx) {
+    console.error("Canvas context is not available.");
+    return; // Exit if ctx is not available
   }
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 function drawPoint(x: number, y: number, color: string) {
-  if (ctx) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI * 2);
-    ctx.fill();
+  if (!ctx) {
+    console.error("Canvas context is not available.");
+    return; // Exit if ctx is not available
   }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function createClearButton() {
@@ -101,4 +93,36 @@ function createClearButton() {
   clearButton.style.marginTop = "20px";
   clearButton.style.marginLeft = "40px";
   app.append(clearButton);
+}
+
+// Get mouse position relative to the canvas
+function getMousePosition(event: MouseEvent) {
+  const bounds = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top,
+  };
+}
+
+// Dispatch the "drawing-changed" event
+function DrawingChanged() {
+  const event = new CustomEvent("drawing-changed", {
+    detail: { strokes }, // Pass the strokes array with the event
+  });
+  canvas.dispatchEvent(event);
+}
+
+// Observer: Handle the "drawing-changed" event
+canvas.addEventListener("drawing-changed", () => {
+  clearCanvas(); // Clear the canvas
+  redrawStrokes(); // Redraw all strokes
+});
+
+// Redraw all strokes
+function redrawStrokes() {
+  strokes.forEach((stroke) => {
+    stroke.forEach(({ x, y }) => {
+      drawPoint(x, y, "black"); // Draw each point in the stroke
+    });
+  });
 }
