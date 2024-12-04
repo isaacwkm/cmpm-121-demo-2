@@ -1,4 +1,5 @@
 import "./style.css";
+import { MarkerLine } from "./MarkerLine.ts";
 
 const APP_NAME = "Gooood Morning World";
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -27,9 +28,9 @@ clearCanvas();
 
 // Drawing Data
 let drawFlag = false;
-let currentStroke: { x: number; y: number }[] = [];
-const strokes: { x: number; y: number }[][] = [];
-const redoStack: { x: number; y: number }[][] = [];
+let currentLine: MarkerLine | null = null;
+const strokes: MarkerLine[] = [];
+const redoStack: MarkerLine[] = [];
 
 // Clear Button
 const clearButton = document.createElement("button");
@@ -76,42 +77,28 @@ redoButton.addEventListener("click", () => {
 });
 
 // Mouse Events
-canvas.addEventListener("mousedown", () => {
+canvas.addEventListener("mousedown", (event) => {
   drawFlag = true;
-  currentStroke = [];
+
+  const { x, y } = getMousePosition(event);
+  currentLine = new MarkerLine(x, y); // Create a new line
   redoStack.length = 0; // Clear redo stack when starting a new stroke
 });
 
 canvas.addEventListener("mousemove", (event) => {
-  if (!drawFlag || !ctx) return;
+  if (!drawFlag || !currentLine || !ctx) return;
 
   const { x, y } = getMousePosition(event);
-
-  if (currentStroke.length === 0) {
-    ctx.beginPath(); // Start a new path
-    ctx.moveTo(x, y); // Move to the starting point
-  } else {
-    const lastPoint = currentStroke[currentStroke.length - 1];
-    ctx.beginPath();
-    ctx.moveTo(lastPoint.x, lastPoint.y); // Move to the previous point
-    ctx.lineTo(x, y); // Draw to the current point
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  currentStroke.push({ x, y }); // Save the point
+  currentLine.drag(x, y); // Extend the current line
+  redrawCanvas(); // Update the canvas
 });
 
 canvas.addEventListener("mouseup", () => {
-  if (!drawFlag) return;
+  if (!drawFlag || !currentLine) return;
 
   drawFlag = false;
-
-  if (currentStroke.length > 0) {
-    strokes.push(currentStroke); // Save the current stroke
-  }
-
+  strokes.push(currentLine); // Save the current line
+  currentLine = null;
   dispatchDrawingChangedEvent();
 });
 
@@ -129,18 +116,12 @@ function redrawCanvas() {
 
   // Redraw all strokes
   for (const stroke of strokes) {
-    ctx.beginPath();
-    for (let i = 0; i < stroke.length; i++) {
-      const { x, y } = stroke[i];
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    stroke.display(ctx);
+  }
+
+  // Draw the current line if it exists
+  if (currentLine) {
+    currentLine.display(ctx);
   }
 }
 
