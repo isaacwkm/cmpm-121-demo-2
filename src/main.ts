@@ -1,7 +1,7 @@
 import "./style.css";
 import { MarkerLine } from "./MarkerLine.ts";
 
-const APP_NAME = "Gooood Morning World";
+const APP_NAME = "Sticker Sketchpad";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
