@@ -3,12 +3,13 @@ import "./style.css";
 const APP_NAME = "Gooood Morning World";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
-// Set the document title
 document.title = APP_NAME;
 
 // Game Title
 const title = document.createElement("h1");
-setTitle();
+title.textContent = APP_NAME;
+title.style.textAlign = "center";
+title.style.marginTop = "10px";
 app.appendChild(title);
 
 // Canvas Setup
@@ -16,113 +17,142 @@ const canvas = document.createElement("canvas");
 canvas.width = 256;
 canvas.height = 256;
 app.append(canvas);
-
 const ctx = canvas.getContext("2d");
+
 if (!ctx) {
-  throw new Error("Failed to get 2D context");
+  throw new Error("Failed to get canvas context");
 }
+
 clearCanvas();
 
-// Data Structures
+// Drawing Data
 let drawFlag = false;
 let currentStroke: { x: number; y: number }[] = [];
-let strokes: { x: number; y: number }[][] = [];
+const strokes: { x: number; y: number }[][] = [];
+const redoStack: { x: number; y: number }[][] = [];
+
+// Clear Button
+const clearButton = document.createElement("button");
+clearButton.id = "clearButton";
+clearButton.textContent = "Clear";
+clearButton.style.marginTop = "20px";
+clearButton.style.marginLeft = "40px";
+app.append(clearButton);
+
+clearButton.addEventListener("click", () => {
+  clearCanvas();
+  strokes.length = 0;
+  redoStack.length = 0;
+});
+
+// Undo Button
+const undoButton = document.createElement("button");
+undoButton.id = "undoButton";
+undoButton.textContent = "Undo";
+undoButton.style.marginTop = "20px";
+undoButton.style.marginLeft = "10px";
+app.append(undoButton);
+
+undoButton.addEventListener("click", () => {
+  if (strokes.length > 0) {
+    redoStack.push(strokes.pop()!);
+    redrawCanvas();
+  }
+});
+
+// Redo Button
+const redoButton = document.createElement("button");
+redoButton.id = "redoButton";
+redoButton.textContent = "Redo";
+redoButton.style.marginTop = "20px";
+redoButton.style.marginLeft = "10px";
+app.append(redoButton);
+
+redoButton.addEventListener("click", () => {
+  if (redoStack.length > 0) {
+    strokes.push(redoStack.pop()!);
+    redrawCanvas();
+  }
+});
 
 // Mouse Events
 canvas.addEventListener("mousedown", () => {
   drawFlag = true;
-  currentStroke = []; // Start a new stroke
+  currentStroke = [];
+  redoStack.length = 0; // Clear redo stack when starting a new stroke
 });
 
 canvas.addEventListener("mousemove", (event) => {
-  if (!drawFlag) return;
+  if (!drawFlag || !ctx) return;
 
   const { x, y } = getMousePosition(event);
-  currentStroke.push({ x, y }); // Add point to the current stroke
-  DrawingChanged(); // Dispatch the event after adding a point
+
+  if (currentStroke.length === 0) {
+    ctx.beginPath(); // Start a new path
+    ctx.moveTo(x, y); // Move to the starting point
+  } else {
+    const lastPoint = currentStroke[currentStroke.length - 1];
+    ctx.beginPath();
+    ctx.moveTo(lastPoint.x, lastPoint.y); // Move to the previous point
+    ctx.lineTo(x, y); // Draw to the current point
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  currentStroke.push({ x, y }); // Save the point
 });
 
-// When mouse is released, save the completed stroke and dispatch the event
 canvas.addEventListener("mouseup", () => {
-  drawFlag = false; // Stop drawing
+  if (!drawFlag) return;
+
+  drawFlag = false;
+
   if (currentStroke.length > 0) {
-    strokes.push(currentStroke); // Save the completed stroke
-    DrawingChanged(); // Dispatch event to trigger redrawing
-    console.log("Stroke completed:", currentStroke);
+    strokes.push(currentStroke); // Save the current stroke
   }
+
+  dispatchDrawingChangedEvent();
 });
 
-// Clear Button
-const clearButton = document.createElement("button");
-createClearButton();
-clearButton.addEventListener("click", () => {
-  clearCanvas();
-  strokes = []; // Reset strokes
-});
-
-// Helper Functions
-function setTitle() {
-  title.textContent = APP_NAME;
-  title.style.textAlign = "center";
-  title.style.marginTop = "10px";
-}
-
+// Utility Functions
 function clearCanvas() {
-  if (!ctx) {
-    console.error("Canvas context is not available.");
-    return; // Exit if ctx is not available
-  }
+  if (!ctx) return;
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-function drawPoint(x: number, y: number, color: string) {
-  if (!ctx) {
-    console.error("Canvas context is not available.");
-    return; // Exit if ctx is not available
+function redrawCanvas() {
+  clearCanvas();
+
+  if (!ctx) return;
+
+  // Redraw all strokes
+  for (const stroke of strokes) {
+    ctx.beginPath();
+    for (let i = 0; i < stroke.length; i++) {
+      const { x, y } = stroke[i];
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, 2, 0, Math.PI * 2);
-  ctx.fill();
 }
 
-function createClearButton() {
-  clearButton.id = "clearButton";
-  clearButton.textContent = "Clear";
-  clearButton.style.marginTop = "20px";
-  clearButton.style.marginLeft = "40px";
-  app.append(clearButton);
+function dispatchDrawingChangedEvent() {
+  const event = new Event("drawing-changed");
+  canvas.dispatchEvent(event);
 }
 
-// Get mouse position relative to the canvas
 function getMousePosition(event: MouseEvent) {
   const bounds = canvas.getBoundingClientRect();
   return {
     x: event.clientX - bounds.left,
     y: event.clientY - bounds.top,
   };
-}
-
-// Dispatch the "drawing-changed" event
-function DrawingChanged() {
-  const event = new CustomEvent("drawing-changed", {
-    detail: { strokes }, // Pass the strokes array with the event
-  });
-  canvas.dispatchEvent(event);
-}
-
-// Observer: Handle the "drawing-changed" event
-canvas.addEventListener("drawing-changed", () => {
-  clearCanvas(); // Clear the canvas
-  redrawStrokes(); // Redraw all strokes
-});
-
-// Redraw all strokes
-function redrawStrokes() {
-  strokes.forEach((stroke) => {
-    stroke.forEach(({ x, y }) => {
-      drawPoint(x, y, "black"); // Draw each point in the stroke
-    });
-  });
 }
