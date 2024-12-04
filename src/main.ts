@@ -32,6 +32,11 @@ let currentLine: MarkerLine | null = null;
 const strokes: MarkerLine[] = [];
 const redoStack: MarkerLine[] = [];
 
+// Drawing Changed Event Listener -- Observer Pattern implementation
+canvas.addEventListener("drawing-changed", () => {
+  redrawCanvas(); // Redraw canvas when drawing changes
+});
+
 // Clear Button
 const clearButton = document.createElement("button");
 clearButton.id = "clearButton";
@@ -39,11 +44,12 @@ clearButton.textContent = "Clear";
 clearButton.style.marginTop = "20px";
 clearButton.style.marginLeft = "40px";
 app.append(clearButton);
-
+// Clear Button Listener
 clearButton.addEventListener("click", () => {
   clearCanvas();
   strokes.length = 0;
   redoStack.length = 0;
+  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
 });
 
 // Undo Button
@@ -53,11 +59,11 @@ undoButton.textContent = "Undo";
 undoButton.style.marginTop = "20px";
 undoButton.style.marginLeft = "10px";
 app.append(undoButton);
-
+// Undo Button Listener
 undoButton.addEventListener("click", () => {
   if (strokes.length > 0) {
-    redoStack.push(strokes.pop()!);
-    redrawCanvas();
+    redoStack.push(strokes.pop()!); // Move the last stroke to the redo stack
+    dispatchDrawingChangedEvent(); // Notify that the drawing has changed
   }
 });
 
@@ -68,11 +74,11 @@ redoButton.textContent = "Redo";
 redoButton.style.marginTop = "20px";
 redoButton.style.marginLeft = "10px";
 app.append(redoButton);
-
+// Redo Button Listener
 redoButton.addEventListener("click", () => {
   if (redoStack.length > 0) {
-    strokes.push(redoStack.pop()!);
-    redrawCanvas();
+    strokes.push(redoStack.pop()!); // Move the last stroke back to the strokes list
+    dispatchDrawingChangedEvent(); // Notify that the drawing has changed
   }
 });
 
@@ -90,7 +96,7 @@ canvas.addEventListener("mousemove", (event) => {
 
   const { x, y } = getMousePosition(event);
   currentLine.drag(x, y); // Extend the current line
-  redrawCanvas(); // Update the canvas
+  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -99,7 +105,7 @@ canvas.addEventListener("mouseup", () => {
   drawFlag = false;
   strokes.push(currentLine); // Save the current line
   currentLine = null;
-  dispatchDrawingChangedEvent();
+  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
 });
 
 // Utility Functions
