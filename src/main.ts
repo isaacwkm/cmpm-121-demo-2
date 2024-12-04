@@ -31,11 +31,38 @@ let drawFlag = false;
 let currentLine: MarkerLine | null = null;
 const strokes: MarkerLine[] = [];
 const redoStack: MarkerLine[] = [];
+let selectedThickness = 2; // Default line thickness
 
-// Drawing Changed Event Listener -- Observer Pattern implementation
-canvas.addEventListener("drawing-changed", () => {
-  redrawCanvas(); // Redraw canvas when drawing changes
-});
+// Tool Buttons
+const toolsContainer = document.createElement("div");
+toolsContainer.style.marginTop = "10px";
+app.appendChild(toolsContainer);
+
+// Create buttons
+const thinButton = createToolButton("Thin", 2);
+const thickButton = createToolButton("Thick", 5);
+toolsContainer.append(thinButton, thickButton);
+
+// Add "selected" class to default tool
+thinButton.classList.add("selectedTool");
+
+// Tool Button Creation Function
+function createToolButton(label: string, thickness: number) {
+  const button = document.createElement("button");
+  button.textContent = label;
+
+  button.addEventListener("click", () => {
+    selectedThickness = thickness;
+
+    // Update button styles
+    document.querySelectorAll("button").forEach((btn) => {
+      btn.classList.remove("selectedTool");
+    });
+    button.classList.add("selectedTool");
+  });
+
+  return button;
+}
 
 // Clear Button
 const clearButton = document.createElement("button");
@@ -44,12 +71,12 @@ clearButton.textContent = "Clear";
 clearButton.style.marginTop = "20px";
 clearButton.style.marginLeft = "40px";
 app.append(clearButton);
-// Clear Button Listener
+
 clearButton.addEventListener("click", () => {
   clearCanvas();
   strokes.length = 0;
   redoStack.length = 0;
-  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
+  dispatchDrawingChangedEvent();
 });
 
 // Undo Button
@@ -59,11 +86,11 @@ undoButton.textContent = "Undo";
 undoButton.style.marginTop = "20px";
 undoButton.style.marginLeft = "10px";
 app.append(undoButton);
-// Undo Button Listener
+
 undoButton.addEventListener("click", () => {
   if (strokes.length > 0) {
-    redoStack.push(strokes.pop()!); // Move the last stroke to the redo stack
-    dispatchDrawingChangedEvent(); // Notify that the drawing has changed
+    redoStack.push(strokes.pop()!);
+    dispatchDrawingChangedEvent();
   }
 });
 
@@ -74,11 +101,11 @@ redoButton.textContent = "Redo";
 redoButton.style.marginTop = "20px";
 redoButton.style.marginLeft = "10px";
 app.append(redoButton);
-// Redo Button Listener
+
 redoButton.addEventListener("click", () => {
   if (redoStack.length > 0) {
-    strokes.push(redoStack.pop()!); // Move the last stroke back to the strokes list
-    dispatchDrawingChangedEvent(); // Notify that the drawing has changed
+    strokes.push(redoStack.pop()!);
+    dispatchDrawingChangedEvent();
   }
 });
 
@@ -87,7 +114,7 @@ canvas.addEventListener("mousedown", (event) => {
   drawFlag = true;
 
   const { x, y } = getMousePosition(event);
-  currentLine = new MarkerLine(x, y); // Create a new line
+  currentLine = new MarkerLine(x, y, selectedThickness); // Pass selected thickness
   redoStack.length = 0; // Clear redo stack when starting a new stroke
 });
 
@@ -96,7 +123,7 @@ canvas.addEventListener("mousemove", (event) => {
 
   const { x, y } = getMousePosition(event);
   currentLine.drag(x, y); // Extend the current line
-  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
+  dispatchDrawingChangedEvent();
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -105,7 +132,7 @@ canvas.addEventListener("mouseup", () => {
   drawFlag = false;
   strokes.push(currentLine); // Save the current line
   currentLine = null;
-  dispatchDrawingChangedEvent(); // Notify that the drawing has changed
+  dispatchDrawingChangedEvent();
 });
 
 // Utility Functions
@@ -114,6 +141,24 @@ function clearCanvas() {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
+
+function dispatchDrawingChangedEvent() {
+  const event = new Event("drawing-changed");
+  canvas.dispatchEvent(event);
+}
+
+function getMousePosition(event: MouseEvent) {
+  const bounds = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top,
+  };
+}
+
+// Attach event listener for "drawing-changed"
+canvas.addEventListener("drawing-changed", () => {
+  redrawCanvas();
+});
 
 function redrawCanvas() {
   clearCanvas();
@@ -129,17 +174,4 @@ function redrawCanvas() {
   if (currentLine) {
     currentLine.display(ctx);
   }
-}
-
-function dispatchDrawingChangedEvent() {
-  const event = new Event("drawing-changed");
-  canvas.dispatchEvent(event);
-}
-
-function getMousePosition(event: MouseEvent) {
-  const bounds = canvas.getBoundingClientRect();
-  return {
-    x: event.clientX - bounds.left,
-    y: event.clientY - bounds.top,
-  };
 }

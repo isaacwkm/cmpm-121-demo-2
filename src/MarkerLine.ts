@@ -1,18 +1,21 @@
 export class MarkerLine {
     private points: { x: number; y: number }[] = [];
+    private thickness: number;
   
-    constructor(initialX: number, initialY: number) {
-      this.points.push({ x: initialX, y: initialY });
+    constructor(startX: number, startY: number, thickness: number = 2) {
+      this.points.push({ x: startX, y: startY });
+      this.thickness = thickness;
     }
   
-    // Method to add a new point to the line
     drag(x: number, y: number) {
       this.points.push({ x, y });
     }
   
-    // Method to display the line on the canvas
     display(ctx: CanvasRenderingContext2D) {
-      if (this.points.length < 2) return;
+      if (!ctx || this.points.length < 2) return;
+  
+      ctx.lineWidth = this.thickness;
+      ctx.strokeStyle = "black";
   
       ctx.beginPath();
       ctx.moveTo(this.points[0].x, this.points[0].y);
@@ -21,8 +24,6 @@ export class MarkerLine {
         ctx.lineTo(this.points[i].x, this.points[i].y);
       }
   
-      ctx.strokeStyle = "black";
-      ctx.lineWidth = 2;
       ctx.stroke();
     }
   }
